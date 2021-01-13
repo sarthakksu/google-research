@@ -39,7 +39,7 @@ class Config(object):
                                # trials
 
     # model
-    self.task_names = ['rte', 'mrpc']  # which tasks to learn
+    self.task_names = ['rte', 'mrpc','covid','mixed','locexp'] #,'geoparse_ny','geoparse_nz',"relevance","informative","humanitarian","eyewitness","keyphrase"]  # which tasks to learn
     self.pretrained = True  # whether to use pre-trained weights
     self.pretrained_model_name = 'uncased_L-12_H-768_A-12'
     self.do_lower_case = True
@@ -107,7 +107,8 @@ class Config(object):
 
     # where the raw GLUE data is
     self.raw_data_dir = os.path.join(topdir, 'glue_data/{:}').format
-
+    #dir for mixed, covid and locexp data
+    self.json_data_dir = os.path.join(topdir,'data/{:}').format
     # where BERT files are
     bert_dir = os.path.join(topdir, 'pretrained_models',
                             self.pretrained_model_name)

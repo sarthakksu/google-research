@@ -23,7 +23,7 @@ import abc
 import scipy
 import sklearn
 import numpy as np
-
+from bam.helpers.conlleval import evaluate
 from bam.task_specific import scorer
 
 
@@ -84,6 +84,30 @@ class F1Scorer(SentenceLevelScorer):
       p = 100.0 * n_correct / n_predicted
       r = 100.0 * n_correct / n_gold
       f1 = 2 * p * r / (p + r)
+    return [
+        ('precision', p),
+        ('recall', r),
+        ('f1', f1),
+        ('loss', self.get_loss()),
+    ]
+
+class BIOF1Scorer(SentenceLevelScorer):
+  """Computes F1 score for BIO style NER classification tasks."""
+
+  def __init__(self,idx2labels):
+    super(BIOF1Scorer, self).__init__()
+    self.idx2labels = idx2labels
+  def _get_results(self):
+  
+    golds = [item for sublist in self._true_labels for item in sublist]
+    preds = [item for sublist in self._preds for item in sublist]
+    gold = [ [ self.idx2labels[x] for x in l if self.idx2labels[x] not in ['[CLS]','[SEP]','[PAD]','X'] ] for l in golds]
+    pred = [ [ self.idx2labels[x] for x in l if self.idx2labels[x] not in ['[CLS]','[SEP]','[PAD]','X'] ] for l in preds]
+
+
+    gold = [item for sublist in gold for item in sublist]
+    pred = [item for sublist in pred for item in sublist]
+    p, r, f1 = evaluate(gold,pred,False)
     return [
         ('precision', p),
         ('recall', r),

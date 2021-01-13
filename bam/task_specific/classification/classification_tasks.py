@@ -28,18 +28,18 @@ from bam.data import task_weighting
 from bam.helpers import utils
 from bam.task_specific import task
 from bam.task_specific.classification import classification_metrics
-
-
+from bam.data.NERLoader import NERLoader
+import json
 class InputExample(task.Example):
   """A single training/test example for simple sequence classification."""
 
-  def __init__(self, eid, task_name, text_a, text_b=None, label=None):
+  def __init__(self, eid, task_name, text_a, text_b=None, label=None, mask=None):
     super(InputExample, self).__init__(task_name)
     self.eid = eid
     self.text_a = text_a
     self.text_b = text_b
     self.label = label
-
+    self.mask = mask
 
 class SingleOutputTask(task.Task):
   """A task with a single label per input (e.g., text classification)."""
@@ -166,7 +166,85 @@ class SingleOutputTask(task.Task):
   def _add_features(self, features, example, distill_inputs):
     pass
 
+class NERTask(task.Task):
+  """A task with a single label per input (e.g., text classification)."""
+  __metaclass__ = abc.ABCMeta
 
+  def __init__(self, config, name, tokenizer,label_list):
+    super(NERTask, self).__init__(config, name)
+    self._tokenizer = tokenizer
+    self._distill_inputs = None
+    self.label_list = label_list
+
+  def featurize(self, example, is_training):
+    """Turn an InputExample into a dict of features."""
+
+    if is_training and self.config.distill and self._distill_inputs is None:
+      self._distill_inputs = utils.load_pickle(
+          self.config.distill_inputs(self.name))
+
+    input_ids = example.text_a
+    input_mask = example.mask
+    segment_ids = []
+    
+    while len(segment_ids) < self.config.max_seq_length:
+      segment_ids.append(0)
+
+    assert len(input_ids) == self.config.max_seq_length
+    assert len(input_mask) == self.config.max_seq_length
+    assert len(segment_ids) == self.config.max_seq_length
+
+    eid = example.eid
+    features = {
+        "input_ids": input_ids,
+        "input_mask": input_mask,
+        "segment_ids": segment_ids,
+        "task_id": self.config.task_names.index(self.name),
+        self.name + "_eid": eid,
+    }
+    self._add_features(features, example,
+                       None if self._distill_inputs is None else
+                       self._distill_inputs[eid])
+    return features
+
+  def _load_processed(self, filename):
+    examples = []
+    with open(filename) as file:
+        data = json.load(file)
+
+        temp_texts = data["Mixed"]["tweets"]
+        temp_labels = data["Mixed"]["labels"]
+    texts=[]
+    labels=[]
+    for text,label in zip(temp_texts,temp_labels):
+        if not len(text.strip()) == 0:
+            texts.append(text)
+            labels.append(label)
+    
+
+    
+    labels2idx = {v:k for k,v in enumerate(self.label_list)}
+    idx2labels = {v: k for k, v in labels2idx.items()}
+
+   
+    loader = NERLoader()
+    text_ids,labels,masks = loader.load(texts, labels, labels2idx, tokenizer=self._tokenizer,max_position_embeddings=self.config.max_seq_length)
+    for (i,text_a) in enumerate(text_ids):
+        eid = i
+        text_b = None
+        label = labels[i]
+        mask = masks[i]
+        examples.append(InputExample(eid=eid, task_name=self.name,
+                                   text_a=text_a, text_b=text_b, label=label,mask=mask))
+    return examples
+  @abc.abstractmethod
+  def _get_dummy_label(self):
+    pass
+
+  @abc.abstractmethod
+  def _add_features(self, features, example, distill_inputs):
+    pass
+    
 class RegressionTask(SingleOutputTask):
   """A regression task (e.g., STS)."""
   __metaclass__ = abc.ABCMeta
@@ -229,6 +307,79 @@ class RegressionTask(SingleOutputTask):
   def get_scorer(self):
     return classification_metrics.RegressionScorer()
 
+class TokenClassificationTask(NERTask):
+  """A classification task (e.g., MNLI)."""
+  __metaclass__ = abc.ABCMeta
+
+  def __init__(self, config, name, tokenizer,
+               label_list):
+    super(ClassificationTask, self).__init__(config, name, tokenizer,label_list)
+    self._tokenizer = tokenizer
+    self._label_list = label_list
+
+  def _get_dummy_label(self):
+    return self._label_list[0]
+
+  def get_feature_specs(self):
+    feature_specs = [feature_spec.FeatureSpec(self.name + "_eid", []),
+                     feature_spec.FeatureSpec(self.name + "_label_ids", [self.config.max_seq_length], is_int_feature=False),
+                     feature_spec.FeatureSpec(self.name + "_masks", [self.config.max_seq_length], is_int_feature=False)]
+    if self.config.distill:
+      feature_specs.append(feature_spec.FeatureSpec(
+          self.name + "_logits", [self.config.max_seq_length], is_int_feature=False))
+    return feature_specs
+
+  def _add_features(self, features, example, distill_inputs):
+    label_id = example.label
+    features[example.task_name + "_label_ids"] = label_id
+    features[example.task_name + "_masks"] = example.mask
+    if distill_inputs is not None:
+      features[self.name + "_logits"] = distill_inputs
+
+  def get_prediction_module(self, bert_model, features, is_training,
+                            percent_done):
+    num_labels = len(self._label_list)
+    reprs = bert_model.get_sequence_output()
+
+    if is_training:
+      reprs = tf.nn.dropout(reprs, keep_prob=0.9)
+
+    logits = tf.layers.dense(reprs, num_labels)
+    #logits = tf.reshape(logits,[-1,FLAGS.max_seq_length,num_labels])
+    mask = features[self.name+"_masks"]
+    mask2len = tf.reduce_sum(mask,axis=1)
+   
+    # probabilities = tf.nn.softmax(logits, axis=-1)
+    log_probs = tf.nn.log_softmax(logits, axis=-1)
+
+    label_ids = features[self.name + "_label_ids"]
+    if self.config.distill:
+      teacher_labels = tf.nn.softmax(features[self.name + "_logits"] / 1.0)
+      true_labels = tf.one_hot(label_ids, depth=num_labels, dtype=tf.float32)
+
+      if self.config.teacher_annealing:
+        labels = ((true_labels * percent_done) +
+                  (teacher_labels * (1 - percent_done)))
+      else:
+        labels = ((true_labels * (1 - self.config.distill_weight)) +
+                  (teacher_labels * self.config.distill_weight))
+    else:
+      labels = tf.one_hot(label_ids, depth=num_labels, dtype=tf.float32)
+
+    #losses = -tf.reduce_sum(labels * log_probs, axis=-1)
+    losses, trans = self.crf_loss(logits,labels * log_probs,mask,num_labels,mask2len)
+    predict,viterbi_score = tf.contrib.crf.crf_decode(logits, trans, mask2len)
+    outputs = dict(
+        loss=losses,
+        logits=logits,
+        predictions=predict,
+        label_ids=label_ids,
+        eid=features[self.name + "_eid"],
+    )
+    return losses, outputs
+
+  def get_scorer(self):
+    return classification_metrics.BIOF1Scorer(self.label_list)
 
 class ClassificationTask(SingleOutputTask):
   """A classification task (e.g., MNLI)."""
@@ -470,3 +621,44 @@ class STS(RegressionTask):
         examples += self._load_glue(
             lines, split, -3, -2, -1, True, offset, True)
     return examples
+class Covid(TokenClassificationTask):
+  """Question Type Classification."""
+
+  def __init__(self, config, tokenizer):
+    super(Covid, self).__init__(config, "covid", tokenizer,
+                               ['[PAD]','[CLS]','[SEP]', 'B-STA', 'I-STA', 'B-CONTR', 'I-CONTR','B-NCT', 'I-NCT', 'B-LB', 'I-LB', 'B-REG', 'I-REG', 'B-OTH', 'I-OTH', 'O','X'])
+    
+  def get_examples(self, split):
+    if split == "dev":
+      split = "val"
+    return self._load_processed(self.config.json_data_dir(self.name+"/"+split + ".json"), split)
+  def get_test_splits(self):
+    return ["test"]
+
+class Mixed(TokenClassificationTask):
+  """Question Type Classification."""
+
+  def __init__(self, config, tokenizer):
+    super(Mixed, self).__init__(config, "mixed", tokenizer,
+                               ['[PAD]','[CLS]','[SEP]', 'B-STA', 'I-STA', 'B-CONTR', 'I-CONTR','B-NCT', 'I-NCT', 'B-LB', 'I-LB', 'B-REG', 'I-REG', 'B-OTH', 'I-OTH', 'O','X'])
+    
+  def get_examples(self, split):
+    if split == "dev":
+      split = "val"
+    return self._load_processed(self.config.json_data_dir(self.name+"/"+split + ".json"), split)
+  def get_test_splits(self):
+    return ["test"]
+    
+class LocExp(TokenClassificationTask):
+  """Question Type Classification."""
+
+  def __init__(self, config, tokenizer):
+    super(LocExp, self).__init__(config, "locexp", tokenizer,
+                               ['[PAD]','[CLS]','[SEP]', 'B-LOC', 'I-LOC','O','X'])
+    
+  def get_examples(self, split):
+    if split == "dev":
+      split = "val"
+    return self._load_processed(self.config.json_data_dir(self.name+"/"+split + ".json"), split)
+  def get_test_splits(self):
+    return ["test"]

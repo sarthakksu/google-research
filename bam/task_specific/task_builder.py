@@ -49,5 +49,11 @@ def get_task(config, task_name, tokenizer):
     return classification_tasks.QQP(config, tokenizer)
   elif task_name == "sts":
     return classification_tasks.STS(config, tokenizer)
+  elif task_name == "covid":
+    return classification_tasks.Covid(config, tokenizer)
+  elif task_name == "mixed":
+    return classification_tasks.Mixed(config, tokenizer)
+  elif task_name == "locexp":
+    return classification_tasks.LocExp(config, tokenizer)
   else:
     raise ValueError("Unknown task " + task_name)
