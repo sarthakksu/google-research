@@ -26,8 +26,8 @@ import math
 import re
 import six
 import tensorflow.compat.v1 as tf
-#from tensorflow.contrib import layers as contrib_layers
-from tensorflow.keras import layers as contrib_layers
+from tensorflow.contrib import layers as contrib_layers
+#from tensorflow.keras import layers as contrib_layers
 
 class BertConfig(object):
   """Configuration for `BertModel`."""
