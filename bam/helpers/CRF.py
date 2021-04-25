@@ -213,13 +213,10 @@ class CustomCRF(tfa.layers.CRF):
         self.START_TAG = START_TAG
         self.STOP_TAG = STOP_TAG
 
-    def add_boundary_energy(self, potentials, mask, start, end):
-        def expand_scalar_to_3d(x):
-            # expand tensor from shape (x, ) to (1, 1, x)
-            return tf.reshape(x, (1, 1, -1))
+    def add_boundary_energy(self, potentials, mask, _start, _end):
 
-        start = tf.cast(tf.reshape(start,(1, 1, -1)), potentials.dtype)
-        end = tf.cast(tf.reshape(end,(1, 1, -1)), potentials.dtype)
+        start = tf.cast(tf.reshape(_start,(1, 1, -1)), potentials.dtype)
+        end = tf.cast(tf.reshape(_end,(1, 1, -1)), potentials.dtype)
         if mask is None:
             potentials = tf.concat(
                 [potentials[:, :1, :] + start, potentials[:, 1:, :]], axis=1
