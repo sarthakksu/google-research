@@ -32,9 +32,9 @@ from bam.data import task_weighting
 from bam.helpers import training_utils
 from bam.helpers import utils
 from bam.task_specific import task_builder
-from tensorflow.contrib import cluster_resolver as contrib_cluster_resolver
-from tensorflow.contrib import tpu as contrib_tpu
-
+#from tensorflow.contrib import cluster_resolver as contrib_cluster_resolver
+#from tensorflow.contrib import tpu as contrib_tpu
+from tensorflow.compat.v1.estimator import tpu as contrib_tpu
 
 class MultitaskModel(object):
   """A multi-task model built on top of BERT."""

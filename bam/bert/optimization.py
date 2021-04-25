@@ -25,7 +25,7 @@ from __future__ import print_function
 
 import re
 import tensorflow.compat.v1 as tf
-from tensorflow.contrib import tpu as contrib_tpu
+#from tensorflow.contrib import tpu as contrib_tpu
 
 
 def create_optimizer(config, loss, num_train_steps):
@@ -74,13 +74,14 @@ def create_optimizer(config, loss, num_train_steps):
       beta_2=0.999,
       epsilon=1e-6,
       exclude_from_weight_decay=["LayerNorm", "layer_norm", "bias"])
-
-  if config.use_tpu:
-    optimizer = contrib_tpu.CrossShardOptimizer(optimizer)
+  #print(learning_rate)
+  
+  #if config.use_tpu:
+  #  optimizer = contrib_tpu.CrossShardOptimizer(optimizer)
 
   tvars = tf.trainable_variables()
   grads = tf.gradients(loss, tvars)
-
+  #print(tvars)
   # This is how the model was pre-trained.
   (grads, _) = tf.clip_by_global_norm(grads, clip_norm=1.0)
 
@@ -91,6 +92,8 @@ def create_optimizer(config, loss, num_train_steps):
   # However, `AdamWeightDecayOptimizer` doesn't do this. But if you use
   # a different optimizer, you should probably take this line out.
   new_global_step = global_step + 1
+  tf.print("New global step")
+  tf.print(new_global_step)
   train_op = tf.group(train_op, [global_step.assign(new_global_step)])
   return train_op
 
@@ -213,12 +216,12 @@ def get_key_to_depths(n_layers):
       "/embeddings/": 0
   }
   for layer in range(n_layers):
-    key_to_depths["/layer_" + str(layer) + "/"] = layer + 1
+    key_to_depths["/layer_._" + str(layer) + "/"] = layer + 1
   return  key_to_depths
 
 
 def _get_edecay_lrs(config, learning_rate):
-  n_layers = int(config.pretrained_model_name.split("L-")[1].split("_")[0])
+  n_layers = config.n_layers #int(config.pretrained_model_name.split("L-")[1].split("_")[0])
   return {
       key: learning_rate * (config.lr_decay ** (n_layers + 2 - depth))
       for key, depth in get_key_to_depths(n_layers).items()
