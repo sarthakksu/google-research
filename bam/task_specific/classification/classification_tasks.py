@@ -634,7 +634,8 @@ class Covid(TokenClassificationTask):
   def get_examples(self, split):
     if split == "dev":
       split = "val"
-    return self._load_processed(self.config.json_data_dir(self.name+"/"+split + ".json"), split)
+    path = self.config.json_data_dir(self.name+"/"+split + ".json")
+    return self._load_processed(path)
   def get_test_splits(self):
     return ["test"]
 
@@ -648,7 +649,7 @@ class Mixed(TokenClassificationTask):
   def get_examples(self, split):
     if split == "dev":
       split = "val"
-    return self._load_processed(self.config.json_data_dir(self.name+"/"+split + ".json"), split)
+    return self._load_processed(self.config.json_data_dir(self.name+"/"+split + ".json"))
   def get_test_splits(self):
     return ["test"]
     
@@ -662,6 +663,6 @@ class LocExp(TokenClassificationTask):
   def get_examples(self, split):
     if split == "dev":
       split = "val"
-    return self._load_processed(self.config.json_data_dir(self.name+"/"+split + ".json"), split)
+    return self._load_processed(self.config.json_data_dir(self.name+"/"+split + ".json"))
   def get_test_splits(self):
     return ["test"]
