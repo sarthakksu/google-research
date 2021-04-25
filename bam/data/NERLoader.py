@@ -37,7 +37,7 @@ class NERLoader:
             masks_ = masks_[:max_position_embeddings-2]
             labels_ = [labels2idx["[CLS]"]]+labels_+[labels2idx["[SEP]"]]
             masks_ = [1]+masks_+[1]
-            text_ids_ = tokenizer.convert_tokens_to_ids([tokenizer.cls_token]+text_ids_+[tokenizer.sep_token])
+            text_ids_ = tokenizer.convert_tokens_to_ids(["[CLS]"]+text_ids_+["[SEP]"])
             labels.append(labels_)
             text_ids.append(text_ids_)
             masks.append(masks_)#([1]*len(text_ids_))
