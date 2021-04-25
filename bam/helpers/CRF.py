@@ -213,6 +213,29 @@ class CustomCRF(tfa.layers.CRF):
         self.START_TAG = START_TAG
         self.STOP_TAG = STOP_TAG
 
+    def add_boundary_energy(self, potentials, mask, start, end):
+        def expand_scalar_to_3d(x):
+            # expand tensor from shape (x, ) to (1, 1, x)
+            return tf.reshape(x, (1, 1, -1))
+
+        start = tf.cast(expand_scalar_to_3d(start), potentials.dtype)
+        end = tf.cast(expand_scalar_to_3d(end), potentials.dtype)
+        if mask is None:
+            potentials = tf.concat(
+                [potentials[:, :1, :] + start, potentials[:, 1:, :]], axis=1
+            )
+            potentials = tf.concat(
+                [potentials[:, :-1, :], potentials[:, -1:, :] + end], axis=1
+            )
+        else:
+            mask = tf.keras.backend.expand_dims(tf.cast(mask, start.dtype), axis=-1)
+            start_mask = tf.cast(self._compute_mask_left_boundary(mask), start.dtype)
+
+            end_mask = tf.cast(self._compute_mask_right_boundary(mask), end.dtype)
+            potentials = potentials + start_mask * start
+            potentials = potentials + end_mask * end
+        return potentials
+    
     def call(self, inputs, mask=None):
         # mask: Tensor(shape=(batch_size, sequence_length), dtype=bool) or None
 
