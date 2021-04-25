@@ -348,7 +348,6 @@ class TokenClassificationTask(NERTask):
       reprs = tf.nn.dropout(reprs, keep_prob=0.9)
     mask = features[self.name + "_masks"]
     mask2len = tf.reduce_sum(mask, axis=1)
-
     decoded_sequence, potentials, sequence_length, chain_kernel, best_score, forward_score, backward_score = self.crf(reprs,mask)#tf.layers.dense(reprs, num_labels)
     posterior_score = forward_score + backward_score
 
