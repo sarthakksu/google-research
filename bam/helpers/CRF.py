@@ -212,6 +212,17 @@ class CustomCRF(tfa.layers.CRF):
         super(CustomCRF,self).__init__(use_kernel=False,**kwargs)
         self.START_TAG = START_TAG
         self.STOP_TAG = STOP_TAG
+        if self.use_boundary:
+            self.left_boundary = self.add_weight(
+                shape=(self.units,),
+                name="left_boundary",
+                initializer=self.boundary_initializer,
+            )
+            self.right_boundary = self.add_weight(
+                shape=(self.units,),
+                name="right_boundary",
+                initializer=self.boundary_initializer,
+            )
 
     def add_boundary_energy(self, potentials, mask, _start, _end):
 
