@@ -209,7 +209,7 @@ class CustomCRF(tfa.layers.CRF):
             STOP_TAG: int = 2,
             **kwargs,
     ):
-        super(CustomCRF,self).__init__(use_kernel=False,**kwargs)
+        super(CustomCRF,self).__init__(use_kernel=False, use_boundary=False,**kwargs)
         self.START_TAG = START_TAG
         self.STOP_TAG = STOP_TAG
         if self.use_boundary:
