@@ -314,7 +314,7 @@ class TokenClassificationTask(NERTask):
 
   def __init__(self, config, name, tokenizer,
                label_list):
-    super(ClassificationTask, self).__init__(config, name, tokenizer,label_list)
+    super(TokenClassificationTask, self).__init__(config, name, tokenizer,label_list)
     self._tokenizer = tokenizer
     self._label_list = label_list
     self.crf = CustomCRF(units=len(label_list))
