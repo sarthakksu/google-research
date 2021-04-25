@@ -218,8 +218,8 @@ class CustomCRF(tfa.layers.CRF):
             # expand tensor from shape (x, ) to (1, 1, x)
             return tf.reshape(x, (1, 1, -1))
 
-        start = tf.cast(expand_scalar_to_3d(start), potentials.dtype)
-        end = tf.cast(expand_scalar_to_3d(end), potentials.dtype)
+        start = tf.cast(tf.reshape(start,(1, 1, -1)), potentials.dtype)
+        end = tf.cast(tf.reshape(end,(1, 1, -1)), potentials.dtype)
         if mask is None:
             potentials = tf.concat(
                 [potentials[:, :1, :] + start, potentials[:, 1:, :]], axis=1
@@ -235,7 +235,7 @@ class CustomCRF(tfa.layers.CRF):
             potentials = potentials + start_mask * start
             potentials = potentials + end_mask * end
         return potentials
-    
+
     def call(self, inputs, mask=None):
         # mask: Tensor(shape=(batch_size, sequence_length), dtype=bool) or None
 
