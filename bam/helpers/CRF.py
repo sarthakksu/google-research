@@ -209,7 +209,7 @@ class CustomCRF(tfa.layers.CRF):
             STOP_TAG: int = 2,
             **kwargs,
     ):
-        super(CustomCRF,self).__init__(**kwargs)
+        super(CustomCRF,self).__init__(user_kernel=False,**kwargs)
         self.START_TAG = START_TAG
         self.STOP_TAG = STOP_TAG
 
@@ -233,7 +233,7 @@ class CustomCRF(tfa.layers.CRF):
                         "Currently, CRF layer do not support left padding"
                     )
 
-        potentials = self._dense_layer(inputs)
+        potentials = tf.layers.dense(inputs,self.units)#self._dense_layer(inputs)
 
         # appending boundary probability info
         if self.use_boundary:
