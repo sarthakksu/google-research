@@ -29,6 +29,7 @@ from bam.helpers import utils
 from bam.task_specific import task
 from bam.task_specific.classification import classification_metrics
 from bam.data.NERLoader import NERLoader
+from bam.helpers.CRF import CustomCRF,distillation_loss
 import json
 class InputExample(task.Example):
   """A single training/test example for simple sequence classification."""
@@ -167,7 +168,7 @@ class SingleOutputTask(task.Task):
     pass
 
 class NERTask(task.Task):
-  """A task with a single label per input (e.g., text classification)."""
+  """A task with a single label per token in input (e.g., NER)."""
   __metaclass__ = abc.ABCMeta
 
   def __init__(self, config, name, tokenizer,label_list):
@@ -316,6 +317,8 @@ class TokenClassificationTask(NERTask):
     super(ClassificationTask, self).__init__(config, name, tokenizer,label_list)
     self._tokenizer = tokenizer
     self._label_list = label_list
+    self.crf = CustomCRF(units=len(label_list))
+    self.T = config.T
 
   def _get_dummy_label(self):
     return self._label_list[0]
@@ -326,7 +329,7 @@ class TokenClassificationTask(NERTask):
                      feature_spec.FeatureSpec(self.name + "_masks", [self.config.max_seq_length], is_int_feature=False)]
     if self.config.distill:
       feature_specs.append(feature_spec.FeatureSpec(
-          self.name + "_logits", [self.config.max_seq_length], is_int_feature=False))
+          self.name + "_distill_targets", [self.config.max_seq_length], is_int_feature=False))
     return feature_specs
 
   def _add_features(self, features, example, distill_inputs):
@@ -334,7 +337,7 @@ class TokenClassificationTask(NERTask):
     features[example.task_name + "_label_ids"] = label_id
     features[example.task_name + "_masks"] = example.mask
     if distill_inputs is not None:
-      features[self.name + "_logits"] = distill_inputs
+      features[self.name + "_distill_targets"] = distill_inputs
 
   def get_prediction_module(self, bert_model, features, is_training,
                             percent_done):
@@ -343,18 +346,18 @@ class TokenClassificationTask(NERTask):
 
     if is_training:
       reprs = tf.nn.dropout(reprs, keep_prob=0.9)
+    mask = features[self.name + "_masks"]
+    mask2len = tf.reduce_sum(mask, axis=1)
 
-    logits = tf.layers.dense(reprs, num_labels)
-    #logits = tf.reshape(logits,[-1,FLAGS.max_seq_length,num_labels])
-    mask = features[self.name+"_masks"]
-    mask2len = tf.reduce_sum(mask,axis=1)
+    decoded_sequence, potentials, sequence_length, chain_kernel, best_score, forward_score, backward_score = self.crf(reprs,mask)#tf.layers.dense(reprs, num_labels)
+    posterior_score = forward_score + backward_score
+
    
-    # probabilities = tf.nn.softmax(logits, axis=-1)
-    log_probs = tf.nn.log_softmax(logits, axis=-1)
+    #log_probs = tf.nn.log_softmax(posterior_score, axis=-1)
 
     label_ids = features[self.name + "_label_ids"]
     if self.config.distill:
-      teacher_labels = tf.nn.softmax(features[self.name + "_logits"] / 1.0)
+      teacher_labels = tf.nn.softmax(features[self.name + "_distill_targets"] / self.T,axis=-1)
       true_labels = tf.one_hot(label_ids, depth=num_labels, dtype=tf.float32)
 
       if self.config.teacher_annealing:
@@ -365,14 +368,14 @@ class TokenClassificationTask(NERTask):
                   (teacher_labels * self.config.distill_weight))
     else:
       labels = tf.one_hot(label_ids, depth=num_labels, dtype=tf.float32)
-
+    losses = distillation_loss(posterior_score, labels, mask, self.T)
     #losses = -tf.reduce_sum(labels * log_probs, axis=-1)
-    losses, trans = self.crf_loss(logits,labels * log_probs,mask,num_labels,mask2len)
-    predict,viterbi_score = tf.contrib.crf.crf_decode(logits, trans, mask2len)
+    #losses, trans = self.crf_loss(logits,labels * log_probs,mask,num_labels,mask2len)
+    #predict,viterbi_score = tf.contrib.crf.crf_decode(logits, trans, mask2len)
     outputs = dict(
         loss=losses,
-        logits=logits,
-        predictions=predict,
+        logits=posterior_score,
+        predictions=decoded_sequence,
         label_ids=label_ids,
         eid=features[self.name + "_eid"],
     )
@@ -626,7 +629,7 @@ class Covid(TokenClassificationTask):
 
   def __init__(self, config, tokenizer):
     super(Covid, self).__init__(config, "covid", tokenizer,
-                               ['[PAD]','[CLS]','[SEP]', 'B-STA', 'I-STA', 'B-CONTR', 'I-CONTR','B-NCT', 'I-NCT', 'B-LB', 'I-LB', 'B-REG', 'I-REG', 'B-OTH', 'I-OTH', 'O','X'])
+                               ['[PAD]','[CLS]','[SEP]', 'B-STA', 'I-STA', 'B-CONTR', 'I-CONTR','B-NCT', 'I-NCT', 'B-LB', 'I-LB', 'B-REG', 'I-REG', 'B-OTH', 'I-OTH', 'O'])
     
   def get_examples(self, split):
     if split == "dev":
@@ -640,7 +643,7 @@ class Mixed(TokenClassificationTask):
 
   def __init__(self, config, tokenizer):
     super(Mixed, self).__init__(config, "mixed", tokenizer,
-                               ['[PAD]','[CLS]','[SEP]', 'B-STA', 'I-STA', 'B-CONTR', 'I-CONTR','B-NCT', 'I-NCT', 'B-LB', 'I-LB', 'B-REG', 'I-REG', 'B-OTH', 'I-OTH', 'O','X'])
+                               ['[PAD]','[CLS]','[SEP]', 'B-STA', 'I-STA', 'B-CONTR', 'I-CONTR','B-NCT', 'I-NCT', 'B-LB', 'I-LB', 'B-REG', 'I-REG', 'B-OTH', 'I-OTH', 'O'])
     
   def get_examples(self, split):
     if split == "dev":
@@ -654,7 +657,7 @@ class LocExp(TokenClassificationTask):
 
   def __init__(self, config, tokenizer):
     super(LocExp, self).__init__(config, "locexp", tokenizer,
-                               ['[PAD]','[CLS]','[SEP]', 'B-LOC', 'I-LOC','O','X'])
+                               ['[PAD]','[CLS]','[SEP]', 'B-LOC', 'I-LOC','O'])
     
   def get_examples(self, split):
     if split == "dev":

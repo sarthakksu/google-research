@@ -20,22 +20,27 @@ class NERLoader:
             labellist = label.split()
             text_ids_=[]
             labels_ = []
+            masks_=[]
             for _,(word,label) in enumerate(zip(textlist,labellist)):
                 token = tokenizer.tokenize(word)
                 text_ids_.extend(token)
+
                 for i,_ in enumerate(token):
                     if i==0:
                         labels_.append(labels2idx[label])
+                        masks_.append(1)
                     else:
-                        labels_.append(labels2idx["X"])# if label == "O" else labels_map["I-"+label.split("-")[1]]]) 
+                        labels_.append(labels2idx["O"] if label == "O" else labels2idx["I-"+label.split("-")[1]])
+                        masks_.append(1)
             labels_=labels_[:max_position_embeddings-2]
             text_ids_=text_ids_[:max_position_embeddings-2]
-            
+            masks_ = masks_[:max_position_embeddings-2]
             labels_ = [labels2idx["[CLS]"]]+labels_+[labels2idx["[SEP]"]]
+            masks_ = [1]+masks_+[1]
             text_ids_ = tokenizer.convert_tokens_to_ids([tokenizer.cls_token]+text_ids_+[tokenizer.sep_token])
             labels.append(labels_)
             text_ids.append(text_ids_)
-            masks.append([1]*len(text_ids_))
+            masks.append(masks_)#([1]*len(text_ids_))
         PAD = 0
         i=0
 

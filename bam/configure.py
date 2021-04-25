@@ -30,7 +30,7 @@ class Config(object):
     self.model_name = model_name
     self.debug = False  # debug mode for quickly running things locally
     self.num_trials = 1  # how many train+eval runs to perform
-
+    self.T = 1 #Temperature for distillation loss on NER tasks.
     # writing model outputs to disk
     self.write_test_outputs = True  # whether to write test set outputs
     self.write_distill_outputs = True  # whether to write distillation targets
