@@ -108,7 +108,7 @@ class Config(object):
     # where the raw GLUE data is
     self.raw_data_dir = os.path.join(topdir, 'glue_data/{:}').format
     #dir for mixed, covid and locexp data
-    self.json_data_dir = os.path.join(topdir,'data/{:}').format
+    self.json_data_dir = os.path.join(topdir,'loc_data/{:}').format
     # where BERT files are
     bert_dir = os.path.join(topdir, 'pretrained_models',
                             self.pretrained_model_name)
