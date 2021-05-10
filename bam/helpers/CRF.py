@@ -52,15 +52,15 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
     bw_transitions = tf.transpose(transitions)
     reversed_feats = tf.zeros_like(feats)
 
-    new_reverse_feats = tf.TensorArray(dtype=feats.dtype, size=feats.shape[0])
-    for i, feat in enumerate(feats):
+    #new_reverse_feats = tf.TensorArray(dtype=feats.dtype, size=feats.shape[0])
+    #for i, feat in enumerate(feats):
         # m * d -> k * d, reverse over tokens -> m * d
-        rev = slice_assign(reversed_feats[i], tf.reverse(feat[:lens_[i]], [0]), slice(None, lens_[i]))
-        new_reverse_feats.write(i, rev)
+    #    rev = slice_assign(reversed_feats[i], tf.reverse(feat[:lens_[i]], [0]), slice(None, lens_[i]))
+    #    new_reverse_feats.write(i, rev)
         # reversed_feats[i][:lens_[i]] = tf.reverse(feat[:lens_[0]],[0])
         # reverse_feats[i][:lens_[i]] = feat[:lens_[i]].filp(0)
-    reversed_feats = new_reverse_feats.stack()
-
+    #reversed_feats = new_reverse_feats.stack()
+    reversed_feats = tf.reverse_sequence(feats, lens_, seq_axis=1, batch_axis=0)
     init_alphas_ = []
     for x in range(units):
         if x == STOP_TAG:
@@ -116,14 +116,15 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
     # flip over tokens, [num_tokens * num_tags]
     #  new_backward_var[i,:lens_[i]] = var[:lens_[i]].flip([0])
 
-    tf_array = tf.TensorArray(dtype=backward_var.dtype, size=feats.shape[0])
-    for i, var in enumerate(backward_var):
+    #tf_array = tf.TensorArray(dtype=backward_var.dtype, size=feats.shape[0])
+    #for i, var in enumerate(backward_var):
         # m * d -> k * d, reverse over tokens -> m * d
-        rev = slice_assign(new_backward_var[i], tf.reverse(var[:lens_[i]], [0]), slice(None, lens_[i]))
-        tf_array.write(i, rev)
+    #    rev = slice_assign(new_backward_var[i], tf.reverse(var[:lens_[i]], [0]), slice(None, lens_[i]))
+    #    tf_array.write(i, rev)
         # reversed_feats[i][:lens_[i]] = tf.reverse(feat[:lens_[0]],[0])
         # reverse_feats[i][:lens_[i]] = feat[:lens_[i]].filp(0)
-    new_backward_var = tf_array.stack()
+    #new_backward_var = tf_array.stack()
+    new_backward_var = tf.reverse_sequence(backward_var, lens_, seq_axis=1, batch_axis=0)
     return new_backward_var
 
 
