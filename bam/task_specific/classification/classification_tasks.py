@@ -317,7 +317,7 @@ class TokenClassificationTask(NERTask):
     super(TokenClassificationTask, self).__init__(config, name, tokenizer,label_list)
     self._tokenizer = tokenizer
     self._label_list = label_list
-    self.crf = CustomCRF(units=len(label_list))
+    self.crf=None
     self.T = config.T
 
   def _get_dummy_label(self):
@@ -342,6 +342,8 @@ class TokenClassificationTask(NERTask):
   def get_prediction_module(self, bert_model, features, is_training,
                             percent_done):
     num_labels = len(self._label_list)
+    if self.crf is None:
+      self.crf = CustomCRF(units=num_labels)
     reprs = bert_model.get_sequence_output()
 
     if is_training:
