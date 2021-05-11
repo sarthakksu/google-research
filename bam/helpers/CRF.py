@@ -25,7 +25,7 @@ def _forward_alg(feats, lens_, transitions, units, START_TAG=0, STOP_TAG=1):
     )
 
     forward_var[:, 0, :] = init_alphas_[None, :].repeat(feats.shape[0], axis=0)
-    forward_var = tf.convert_to_tensor(forward_var, dtype=transitions.dtype)
+    forward_var = tf.Variable(forward_var, dtype=transitions.dtype, trainable=False)
     transitions = tf.repeat(tf.reshape(transitions, (1, transitions.shape[0], transitions.shape[1])), feats.shape[0], 0)
 
     for i in range(feats.shape[1]):
@@ -43,22 +43,8 @@ def _forward_alg(feats, lens_, transitions, units, START_TAG=0, STOP_TAG=1):
         tag_var = tag_var - tf.repeat(max_tag_var[:, :, None], transitions.shape[2], axis=-1)
         agg_ = tf.math.log(tf.math.reduce_sum(tf.math.exp(tag_var), axis=2))
 
-        cloned = tf.identity(forward_var)
-        modified = []
-        counter = 0
-        val = max_tag_var + agg_
-        for k in range(cloned.shape[0]):
-            m = []
-            for j in range(cloned.shape[1]):
-                if j != i + 1:
-                    m.append(cloned[k, j, :])
-                else:
-                    m.append(val[counter])
-                    counter += 1
-            modified.append(m)
-        cloned = tf.stack(modified)
 
-        forward_var = cloned
+        forward_var = forward_var[:, i + 1, :].assign(max_tag_var + agg_)
     return forward_var[:, 1:]
 
 
@@ -84,7 +70,7 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
     )
 
     forward_var[:, 0, :] = init_alphas_[None, :].repeat(reversed_feats.shape[0], axis=0)
-    forward_var_ = tf.convert_to_tensor(forward_var, dtype=transitions.dtype)
+    forward_var_ = tf.Variable(forward_var, dtype=transitions.dtype, trainable=False)
     transitions = tf.repeat(tf.reshape(bw_transitions, (1, bw_transitions.shape[0], bw_transitions.shape[1])),
                             reversed_feats.shape[0], 0)
 
@@ -96,9 +82,9 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
         if i == 0:
             emit_score = tf.zeros_like(reversed_feats[:, 0, :])
 
-
         else:
             emit_score = reversed_feats[:, i - 1, :]
+
         forward_cont_ = tf.transpose(tf.repeat(forward_var_[:, i, :][:, :, None], [transitions.shape[2]], axis=-1),
                                      (0, 2, 1))
         emit_cont = tf.repeat(emit_score[:, None, :], transitions.shape[2], axis=1)
@@ -113,26 +99,8 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
 
         agg_ = tf.math.log(tf.math.reduce_sum(tf.math.exp(tag_var), axis=2))
 
-
-        cloned_ = tf.identity(forward_var_)
-
-        modified = []
-        counter = 0
-        val = max_tag_var + agg_
-        for k in range(cloned_.shape[0]):
-            m = []
-            for j in range(cloned_.shape[1]):
-                if j != i + 1:
-                    m.append(cloned_[k, j, :])
-                else:
-                    m.append(val[counter])
-                    counter += 1
-            modified.append(m)
-        cloned_ = tf.stack(modified)
-
-        forward_var_ = cloned_
+        forward_var_ = forward_var_[:, i + 1, :].assign(max_tag_var + agg_)
     backward_var = tf.identity(forward_var_[:, 1:])
-
     new_backward_var = tf.reverse_sequence(backward_var, lens_, seq_axis=1, batch_axis=0)
     return new_backward_var
 
