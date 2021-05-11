@@ -36,7 +36,8 @@ from bam.task_specific import task_builder
 #from tensorflow.contrib import tpu as contrib_tpu
 from tensorflow.compat.v1.estimator import tpu as contrib_tpu
 
-tf.disable_v2_behavior()
+#tf.disable_v2_behavior()
+#tf.enable_eager_execution()
 class MultitaskModel(object):
   """A multi-task model built on top of BERT."""
 

@@ -78,7 +78,7 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
     )
 
     forward_var[:, 0, :] = init_alphas_[None, :].repeat(reversed_feats.shape[0], axis=0)
-
+    forward_var = tf.convert_to_tensor(forward_var,forward_var.dtype)
     transitions = tf.repeat(tf.reshape(bw_transitions, (1, bw_transitions.shape[0], bw_transitions.shape[1])),
                             reversed_feats.shape[0], 0)
 
@@ -88,12 +88,13 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
 
     for i in range(reversed_feats.shape[1]):
         if i == 0:
-            emit_score = np.zeros_like(reversed_feats[:, 0, :])
+            emit_score = tf.zeros_like(reversed_feats[:, 0, :])
         else:
-            emit_score = reversed_feats[:, i - 1, :].numpy()
+            emit_score = reversed_feats[:, i - 1, :]
         # pdb.set_trace()
         forward_cont = forward_var[:, i, :][:, :, None].repeat([transitions.shape[2]], axis=-1).transpose(0, 2, 1)
-        emit_cont = emit_score[:, None, :].repeat(transitions.shape[2], axis=1)
+        #emit_cont = emit_score[:, None, :].repeat(transitions.shape[2], axis=1)
+        emit_cont = tf.repeat(emit_score[:, None, :],transitions.shape[2], axis=1)
         tag_var = (emit_cont
                    + transitions
                    + forward_cont
@@ -107,10 +108,9 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
 
         cloned = np.copy(forward_var)
         cloned[:, i + 1, :] = max_tag_var + agg_
-
         forward_var = cloned
     backward_var = np.copy(forward_var[:, 1:])
-    new_backward_var = np.zeros_like(backward_var)
+    #new_backward_var = np.zeros_like(backward_var)
     # for i, var in enumerate(backward_var):
 
     # flip over tokens, [num_tokens * num_tags]
