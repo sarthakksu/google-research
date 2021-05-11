@@ -25,13 +25,15 @@ def _forward_alg(feats, lens_, transitions, units, START_TAG=0, STOP_TAG=1):
     )
 
     forward_var[:, 0, :] = init_alphas_[None, :].repeat(feats.shape[0], axis=0)
+    forward_var = tf.convert_to_tensor(forward_var, dtype=transitions.dtype)
     transitions = tf.repeat(tf.reshape(transitions, (1, transitions.shape[0], transitions.shape[1])), feats.shape[0], 0)
 
     for i in range(feats.shape[1]):
-        emit_score = feats[:, i, :].numpy()
+        emit_score = feats[:, i, :]
 
-        forward_cont = forward_var[:, i, :][:, :, None].repeat([transitions.shape[2]], axis=-1).transpose(0, 2, 1)
-        emit_cont = emit_score[:, None, :].repeat(transitions.shape[2], axis=1).transpose(0, 2, 1)
+        forward_cont = tf.transpose(tf.repeat(forward_var[:, i, :][:, :, None], [transitions.shape[2]], axis=-1),
+                                    (0, 2, 1))
+        emit_cont = tf.transpose(tf.repeat(emit_score[:, None, :], transitions.shape[2], axis=1), (0, 2, 1))
         tag_var = (emit_cont
                    + transitions
                    + forward_cont
@@ -41,8 +43,20 @@ def _forward_alg(feats, lens_, transitions, units, START_TAG=0, STOP_TAG=1):
         tag_var = tag_var - tf.repeat(max_tag_var[:, :, None], transitions.shape[2], axis=-1)
         agg_ = tf.math.log(tf.math.reduce_sum(tf.math.exp(tag_var), axis=2))
 
-        cloned = np.copy(forward_var)
-        cloned[:, i + 1, :] = max_tag_var + agg_
+        cloned = tf.identity(forward_var)
+        modified = []
+        counter = 0
+        val = max_tag_var + agg_
+        for k in range(cloned.shape[0]):
+            m = []
+            for j in range(cloned.shape[1]):
+                if j != i + 1:
+                    m.append(cloned[k, j, :])
+                else:
+                    m.append(val[counter])
+                    counter += 1
+            modified.append(m)
+        cloned = tf.stack(modified)
 
         forward_var = cloned
     return forward_var[:, 1:]
@@ -52,14 +66,6 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
     bw_transitions = tf.transpose(transitions)
     reversed_feats = tf.zeros_like(feats)
 
-    #new_reverse_feats = tf.TensorArray(dtype=feats.dtype, size=feats.shape[0])
-    #for i, feat in enumerate(feats):
-        # m * d -> k * d, reverse over tokens -> m * d
-    #    rev = slice_assign(reversed_feats[i], tf.reverse(feat[:lens_[i]], [0]), slice(None, lens_[i]))
-    #    new_reverse_feats.write(i, rev)
-        # reversed_feats[i][:lens_[i]] = tf.reverse(feat[:lens_[0]],[0])
-        # reverse_feats[i][:lens_[i]] = feat[:lens_[i]].filp(0)
-    #reversed_feats = new_reverse_feats.stack()
     reversed_feats = tf.reverse_sequence(feats, lens_, seq_axis=1, batch_axis=0)
     init_alphas_ = []
     for x in range(units):
@@ -78,7 +84,7 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
     )
 
     forward_var[:, 0, :] = init_alphas_[None, :].repeat(reversed_feats.shape[0], axis=0)
-    forward_var = tf.convert_to_tensor(forward_var,forward_var.dtype)
+    forward_var_ = tf.convert_to_tensor(forward_var, dtype=transitions.dtype)
     transitions = tf.repeat(tf.reshape(bw_transitions, (1, bw_transitions.shape[0], bw_transitions.shape[1])),
                             reversed_feats.shape[0], 0)
 
@@ -89,41 +95,44 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
     for i in range(reversed_feats.shape[1]):
         if i == 0:
             emit_score = tf.zeros_like(reversed_feats[:, 0, :])
+
+
         else:
             emit_score = reversed_feats[:, i - 1, :]
-        # pdb.set_trace()
-        forward_cont = forward_var[:, i, :][:, :, None].repeat([transitions.shape[2]], axis=-1).transpose(0, 2, 1)
-        #emit_cont = emit_score[:, None, :].repeat(transitions.shape[2], axis=1)
-        emit_cont = tf.repeat(emit_score[:, None, :],transitions.shape[2], axis=1)
+        forward_cont_ = tf.transpose(tf.repeat(forward_var_[:, i, :][:, :, None], [transitions.shape[2]], axis=-1),
+                                     (0, 2, 1))
+        emit_cont = tf.repeat(emit_score[:, None, :], transitions.shape[2], axis=1)
+
         tag_var = (emit_cont
                    + transitions
-                   + forward_cont
+                   + forward_cont_
                    )
-
         max_tag_var = tf.reduce_max(tag_var, reduction_indices=[-1])
 
         tag_var = tag_var - tf.repeat(max_tag_var[:, :, None], transitions.shape[2], axis=-1)
 
         agg_ = tf.math.log(tf.math.reduce_sum(tf.math.exp(tag_var), axis=2))
 
-        cloned = np.copy(forward_var)
-        cloned[:, i + 1, :] = max_tag_var + agg_
-        forward_var = cloned
-    backward_var = np.copy(forward_var[:, 1:])
-    #new_backward_var = np.zeros_like(backward_var)
-    # for i, var in enumerate(backward_var):
 
-    # flip over tokens, [num_tokens * num_tags]
-    #  new_backward_var[i,:lens_[i]] = var[:lens_[i]].flip([0])
+        cloned_ = tf.identity(forward_var_)
 
-    #tf_array = tf.TensorArray(dtype=backward_var.dtype, size=feats.shape[0])
-    #for i, var in enumerate(backward_var):
-        # m * d -> k * d, reverse over tokens -> m * d
-    #    rev = slice_assign(new_backward_var[i], tf.reverse(var[:lens_[i]], [0]), slice(None, lens_[i]))
-    #    tf_array.write(i, rev)
-        # reversed_feats[i][:lens_[i]] = tf.reverse(feat[:lens_[0]],[0])
-        # reverse_feats[i][:lens_[i]] = feat[:lens_[i]].filp(0)
-    #new_backward_var = tf_array.stack()
+        modified = []
+        counter = 0
+        val = max_tag_var + agg_
+        for k in range(cloned_.shape[0]):
+            m = []
+            for j in range(cloned_.shape[1]):
+                if j != i + 1:
+                    m.append(cloned_[k, j, :])
+                else:
+                    m.append(val[counter])
+                    counter += 1
+            modified.append(m)
+        cloned_ = tf.stack(modified)
+
+        forward_var_ = cloned_
+    backward_var = tf.identity(forward_var_[:, 1:])
+
     new_backward_var = tf.reverse_sequence(backward_var, lens_, seq_axis=1, batch_axis=0)
     return new_backward_var
 
