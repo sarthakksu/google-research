@@ -325,7 +325,7 @@ class TokenClassificationTask(NERTask):
 
   def get_feature_specs(self):
     feature_specs = [feature_spec.FeatureSpec(self.name + "_eid", []),
-                     feature_spec.FeatureSpec(self.name + "_label_ids", [self.config.max_seq_length], is_int_feature=False),
+                     feature_spec.FeatureSpec(self.name + "_label_ids", [self.config.max_seq_length], is_int_feature=True),
                      feature_spec.FeatureSpec(self.name + "_masks", [self.config.max_seq_length], is_int_feature=False)]
     if self.config.distill:
       feature_specs.append(feature_spec.FeatureSpec(
