@@ -343,11 +343,13 @@ class TokenClassificationTask(NERTask):
                             percent_done):
     num_labels = len(self._label_list)
     if self.crf is None:
-      self.crf = CustomCRF(units=num_labels)
+      self.crf = CustomCRF(units=num_labels,use_kernerl=False)
+    
     reprs = bert_model.get_sequence_output()
 
     if is_training:
       reprs = tf.nn.dropout(reprs, keep_prob=0.9)
+    reprs = tf.layers.dense(reprs,num_labels)
     mask = features[self.name + "_masks"]
     mask2len = tf.reduce_sum(mask, axis=1)
     decoded_sequence,  best_score, forward_score, backward_score = self.crf(reprs,mask)#tf.layers.dense(reprs, num_labels)
