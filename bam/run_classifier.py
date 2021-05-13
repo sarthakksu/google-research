@@ -178,6 +178,7 @@ class ModelRunner(object):
         input_fn=self._train_input_fn, max_steps=self.train_steps)
 
   def evaluate(self):
+    tf.reset_default_graph()
     return {task.name: self._evaluate_task(task) for task in self._tasks}
 
   def _evaluate_task(self, task):

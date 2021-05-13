@@ -342,14 +342,13 @@ class TokenClassificationTask(NERTask):
   def get_prediction_module(self, bert_model, features, is_training,
                             percent_done):
     num_labels = len(self._label_list)
-    if self.crf is None:
-      self.crf = CustomCRF(units=num_labels,use_kernerl=False)
+    #if self.crf is None:
+    self.crf = CustomCRF(units=num_labels)
     
     reprs = bert_model.get_sequence_output()
 
     if is_training:
       reprs = tf.nn.dropout(reprs, keep_prob=0.9)
-    reprs = tf.layers.dense(reprs,num_labels)
     mask = features[self.name + "_masks"]
     mask2len = tf.reduce_sum(mask, axis=1)
     decoded_sequence,  best_score, forward_score, backward_score = self.crf(reprs,mask)#tf.layers.dense(reprs, num_labels)
@@ -371,7 +370,7 @@ class TokenClassificationTask(NERTask):
                   (teacher_labels * self.config.distill_weight))
     else:
       labels = tf.one_hot(label_ids, depth=num_labels, dtype=tf.float32)
-    losses = distillation_loss(posterior_score, labels, mask, self.T)
+    losses = tf.repeat(tf.expand_dims(distillation_loss(posterior_score, labels, mask, self.T),axis=0),repeats=[label_ids.shape[0]])
     #losses = -tf.reduce_sum(labels * log_probs, axis=-1)
     #losses, trans = self.crf_loss(logits,labels * log_probs,mask,num_labels,mask2len)
     #predict,viterbi_score = tf.contrib.crf.crf_decode(logits, trans, mask2len)
