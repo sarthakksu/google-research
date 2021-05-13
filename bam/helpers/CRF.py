@@ -35,7 +35,7 @@ def _forward_alg(feats, lens_, transitions, units, START_TAG=0, STOP_TAG=1):
                    + transitions
                    + forward_cont
                    )
-        max_tag_var = tf.reduce_max(tag_var, reduction_indices=[2])
+        max_tag_var = tf.reduce_max(tag_var, axis=2)
 
         tag_var = tag_var - tf.repeat(max_tag_var[:, :, None], transitions.shape[2], axis=-1)
         agg_ = tf.math.log(tf.math.reduce_sum(tf.math.exp(tag_var), axis=2))
@@ -88,7 +88,7 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
                    + transitions
                    + forward_cont_
                    )
-        max_tag_var = tf.reduce_max(tag_var, reduction_indices=[-1])
+        max_tag_var = tf.reduce_max(tag_var, axis=-1)
 
         tag_var = tag_var - tf.repeat(max_tag_var[:, :, None], transitions.shape[2], axis=-1)
 
