@@ -89,7 +89,7 @@ class Config(object):
     self.n_tasks = len(self.task_names)
     if self.n_tasks == 1:
       self.dataset_multiples = False
-      self.train_batch_size = 32
+      self.train_batch_size = 8
       self.num_train_epochs = 3.0
       self.learning_rate = 5e-5
 
@@ -98,7 +98,7 @@ class Config(object):
       self.save_checkpoints_steps = 1000000
       self.use_tfrecords_if_existing = False
       self.iterations_per_loop = 1
-      self.train_batch_size = 32
+      self.train_batch_size = 8
       self.num_train_epochs = 3.0
       self.dataset_multiples = False
 
