@@ -1,11 +1,8 @@
 import warnings
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 import numpy as np
-import tensorflow_addons as tfa
-from tensorflow_addons.utils.types import TensorLike
-from tensorflow_addons.text.crf import crf_decode_forward
-from tensorflow_addons.text.crf import crf_decode_backward
-from tf_slice_assign import slice_assign
+from tf_crf_layer.layer import CRF
+from tf_crf_layer.crf import crf_decode
 
 
 def _forward_alg(feats, lens_, transitions, units, START_TAG=0, STOP_TAG=1):
@@ -43,15 +40,14 @@ def _forward_alg(feats, lens_, transitions, units, START_TAG=0, STOP_TAG=1):
         tag_var = tag_var - tf.repeat(max_tag_var[:, :, None], transitions.shape[2], axis=-1)
         agg_ = tf.math.log(tf.math.reduce_sum(tf.math.exp(tag_var), axis=2))
 
+        forward_var[:, i + 1, :].assign(max_tag_var + agg_)
 
-        forward_var = forward_var[:, i + 1, :].assign(max_tag_var + agg_)
     return forward_var[:, 1:]
 
 
 def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1):
     bw_transitions = tf.transpose(transitions)
     reversed_feats = tf.zeros_like(feats)
-
     reversed_feats = tf.reverse_sequence(feats, lens_, seq_axis=1, batch_axis=0)
     init_alphas_ = []
     for x in range(units):
@@ -84,7 +80,6 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
 
         else:
             emit_score = reversed_feats[:, i - 1, :]
-
         forward_cont_ = tf.transpose(tf.repeat(forward_var_[:, i, :][:, :, None], [transitions.shape[2]], axis=-1),
                                      (0, 2, 1))
         emit_cont = tf.repeat(emit_score[:, None, :], transitions.shape[2], axis=1)
@@ -99,182 +94,29 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
 
         agg_ = tf.math.log(tf.math.reduce_sum(tf.math.exp(tag_var), axis=2))
 
-        forward_var_ = forward_var_[:, i + 1, :].assign(max_tag_var + agg_)
+        forward_var_[:, i + 1, :].assign(max_tag_var + agg_)
     backward_var = tf.identity(forward_var_[:, 1:])
     new_backward_var = tf.reverse_sequence(backward_var, lens_, seq_axis=1, batch_axis=0)
     return new_backward_var
 
 
-def crf_decode(
-        potentials: TensorLike, transition_params: TensorLike, sequence_length: TensorLike, units,
-        START_TAG=0, STOP_TAG=1) -> tf.Tensor:
-    """Decode the highest scoring sequence of tags.
-    Args:
-      potentials: A [batch_size, max_seq_len, num_tags] tensor of
-                unary potentials.
-      transition_params: A [num_tags, num_tags] matrix of
-                binary potentials.
-      sequence_length: A [batch_size] vector of true sequence lengths.
-    Returns:
-      decode_tags: A [batch_size, max_seq_len] matrix, with dtype `tf.int32`.
-                  Contains the highest scoring tag indices.
-      best_score: A [batch_size] vector, containing the score of `decode_tags`.
-    """
-    if tf.__version__[:3] == "2.4":
-        warnings.warn(
-            "CRF Decoding does not work with KerasTensors in TF2.4. The bug has since been fixed in tensorflow/tensorflow##45534"
-        )
-    sequence_length = tf.cast(sequence_length, dtype=tf.int32)
-
-    # If max_seq_len is 1, we skip the algorithm and simply return the
-    # argmax tag and the max activation.
-    def _single_seq_fn():
-        decode_tags = tf.cast(tf.argmax(potentials, axis=2), dtype=tf.int32)
-        best_score = tf.reshape(tf.reduce_max(potentials, axis=2), shape=[-1])
-        return decode_tags, best_score, None, None
-
-    def _multi_seq_fn():
-        # Computes forward decoding. Get last score and backpointers.
-        initial_state = tf.slice(potentials, [0, 0, 0], [-1, 1, -1])
-        initial_state = tf.squeeze(initial_state, axis=[1])
-        inputs = tf.slice(potentials, [0, 1, 0], [-1, -1, -1])
-
-        sequence_length_less_one = tf.maximum(
-            tf.constant(0, dtype=tf.int32), sequence_length - 1
-        )
-
-        backpointers, last_score = crf_decode_forward(
-            inputs, initial_state, transition_params, sequence_length_less_one
-        )
-
-        backpointers = tf.reverse_sequence(
-            backpointers, sequence_length_less_one, seq_axis=1
-        )
-
-        initial_state = tf.cast(tf.argmax(last_score, axis=1), dtype=tf.int32)
-        initial_state = tf.expand_dims(initial_state, axis=-1)
-
-        decode_tags = crf_decode_backward(backpointers, initial_state)
-
-        decode_tags = tf.squeeze(decode_tags, axis=[2])
-        decode_tags = tf.concat([initial_state, decode_tags], axis=1)
-        decode_tags = tf.reverse_sequence(decode_tags, sequence_length, seq_axis=1)
-
-        best_score = tf.reduce_max(last_score, axis=1)
-        backward_score = _backward_alg(potentials, sequence_length, transition_params, units=units, START_TAG=START_TAG,
-                                       STOP_TAG=STOP_TAG)
-        forward_score = _forward_alg(potentials, sequence_length, transition_params, units=units, START_TAG=START_TAG,
-                                     STOP_TAG=STOP_TAG)
-        return decode_tags, best_score, forward_score, backward_score
-
-    if potentials.shape[1] is not None:
-        # shape is statically know, so we just execute
-        # the appropriate code path
-        if potentials.shape[1] == 1:
-            return _single_seq_fn()
-        else:
-            return _multi_seq_fn()
-    else:
-        return tf.cond(
-            tf.equal(tf.shape(potentials)[1], 1), _single_seq_fn, _multi_seq_fn
-        )
-
-
-class CustomCRF(tfa.layers.CRF):
+class CustomCRF(CRF):
     def __init__(
             self,
-            START_TAG: int = 1,
-            STOP_TAG: int = 2,
+            START_TAG: int = 0,
+            STOP_TAG: int = 1,
             **kwargs,
     ):
-        super(CustomCRF,self).__init__(use_kernel=False, use_boundary=False,**kwargs)
+        super().__init__(**kwargs)
         self.START_TAG = START_TAG
         self.STOP_TAG = STOP_TAG
-        if self.use_boundary:
-            self.left_boundary = self.add_weight(
-                shape=(self.units,),
-                name="left_boundary",
-                initializer=self.boundary_initializer,
-            )
-            self.right_boundary = self.add_weight(
-                shape=(self.units,),
-                name="right_boundary",
-                initializer=self.boundary_initializer,
-            )
-
-    def add_boundary_energy(self, potentials, mask, _start, _end):
-
-        start = tf.cast(tf.reshape(_start,(1, 1, -1)), potentials.dtype)
-        end = tf.cast(tf.reshape(_end,(1, 1, -1)), potentials.dtype)
-        if mask is None:
-            potentials = tf.concat(
-                [potentials[:, :1, :] + start, potentials[:, 1:, :]], axis=1
-            )
-            potentials = tf.concat(
-                [potentials[:, :-1, :], potentials[:, -1:, :] + end], axis=1
-            )
-        else:
-            mask = tf.keras.backend.expand_dims(tf.cast(mask, start.dtype), axis=-1)
-            start_mask = tf.cast(self._compute_mask_left_boundary(mask), start.dtype)
-
-            end_mask = tf.cast(self._compute_mask_right_boundary(mask), end.dtype)
-            potentials = potentials + start_mask * start
-            potentials = potentials + end_mask * end
-        return potentials
-
-    def call(self, inputs, mask=None):
-        # mask: Tensor(shape=(batch_size, sequence_length), dtype=bool) or None
-
-        if mask is not None:
-            if len(mask.shape) != 2:
-                raise ValueError("Input mask to CRF must have dim 2 if not None")
-
-        if mask is not None:
-            # left padding of mask is not supported, due the underline CRF function
-            # detect it and report it to user
-            left_boundary_mask = self._compute_mask_left_boundary(mask)
-            first_mask = left_boundary_mask[:, 0]
-            if first_mask is not None and tf.executing_eagerly():
-                no_left_padding = tf.math.reduce_all(first_mask)
-                left_padding = not no_left_padding
-                if left_padding:
-                    raise NotImplementedError(
-                        "Currently, CRF layer do not support left padding"
-                    )
-
-        potentials = tf.layers.dense(inputs,self.units)#self._dense_layer(inputs)
-
-        # appending boundary probability info
-        if self.use_boundary:
-            potentials = self.add_boundary_energy(
-                potentials, mask, self.left_boundary, self.right_boundary
-            )
-
-        sequence_length = self._get_sequence_length(inputs, mask)
-
-        decoded_sequence, best_score, forward_score, backward_score = self.get_viterbi_decoding(potentials,
-                                                                                                sequence_length)
-
-        return [decoded_sequence, potentials, sequence_length, self.chain_kernel, best_score, forward_score,
-                backward_score]
 
     def get_viterbi_decoding(self, potentials, sequence_length):
         # decode_tags: A [batch_size, max_seq_len] matrix, with dtype `tf.int32`
-        decode_tags, best_score, forward_score, backward_score = crf_decode(
-            potentials, self.chain_kernel, sequence_length, units=self.units, START_TAG=self.START_TAG,
-            STOP_TAG=self.STOP_TAG
-        )
+        decoded_tags, best_score = super().get_viterbi_decoding(potentials, sequence_length)
+        forward_score = _forward_alg(potentials, sequence_length, self.chain_kernel, units=self.units,
+                                     START_TAG=self.START_TAG, STOP_TAG=self.STOP_TAG)
+        backward_score = _backward_alg(potentials, sequence_length, self.chain_kernel, units=self.units, T=1,
+                                       START_TAG=self.START_TAG, STOP_TAG=self.STOP_TAG)
 
-        return decode_tags, best_score, forward_score, backward_score
-def distillation_loss(features, teacher_features, mask, T = 1, teacher_is_score=True,sentence_level_loss=True):
-		# TODO: time with mask, and whether this should do softmax
-  if teacher_is_score:
-    #teacher_prob=F.softmax(teacher_features/T, dim=-1)
-    teacher_prob = tf.nn.softmax(teacher_features/T, axis=-1,)
-  else:
-    teacher_prob=teacher_features
-  #KD_loss = torch.nn.functional.kl_div(F.log_softmax(features/T, dim=-1), teacher_prob,reduction='none') * mask.unsqueeze(-1) * T * T
-  KD_loss_fn = tf.keras.losses.KLDivergence(reduction=tf.losses.Reduction.NONE)
-  KD_loss = KD_loss_fn(tf.nn.log_softmax(features/T,axis=-1),teacher_prob) * mask * T * T
-  KD_loss = tf.reduce_sum(KD_loss)/KD_loss.shape[0]
-  return KD_loss
+        return (decoded_tags, best_score, forward_score, backward_score), None
