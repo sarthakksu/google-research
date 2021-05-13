@@ -99,7 +99,7 @@ def _backward_alg(feats, lens_, transitions, units, T=1, START_TAG=0, STOP_TAG=1
     new_backward_var = tf.reverse_sequence(backward_var, lens_, seq_axis=1, batch_axis=0)
     return new_backward_var
 
-def _calculate_distillation_loss(features, teacher_features, mask, T = 1, teacher_is_score=True,sentence_level_loss=True):
+def distillation_loss(features, teacher_features, mask, T = 1, teacher_is_score=True,sentence_level_loss=True):
 		# TODO: time with mask, and whether this should do softmax
   if teacher_is_score:
     #teacher_prob=F.softmax(teacher_features/T, dim=-1)
