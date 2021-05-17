@@ -39,7 +39,7 @@ class Config(object):
                                # trials
 
     # model
-    self.task_names = ['rte', 'mrpc','covid','mixed','locexp'] #,'geoparse_ny','geoparse_nz',"relevance","informative","humanitarian","eyewitness","keyphrase"]  # which tasks to learn
+    self.task_names = ['rte', 'mrpc','covid','mixed','locexp','geony','geonz'] #,"relevance","informative","humanitarian","eyewitness","keyphrase"]  # which tasks to learn
     self.pretrained = True  # whether to use pre-trained weights
     self.pretrained_model_name = 'uncased_L-12_H-768_A-12'
     self.do_lower_case = True

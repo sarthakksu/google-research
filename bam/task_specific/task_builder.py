@@ -55,5 +55,9 @@ def get_task(config, task_name, tokenizer):
     return classification_tasks.Mixed(config, tokenizer)
   elif task_name == "locexp":
     return classification_tasks.LocExp(config, tokenizer)
+  elif task_name == "geony":
+    return classification_tasks.GeoNY(config, tokenizer)
+  elif task_name == "geonz":
+    return classification_tasks.GeoNZ(config, tokenizer)
   else:
     raise ValueError("Unknown task " + task_name)

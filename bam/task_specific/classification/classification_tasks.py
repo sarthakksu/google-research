@@ -668,3 +668,34 @@ class LocExp(TokenClassificationTask):
     return self._load_processed(self.config.json_data_dir(self.name+"/"+split + ".json"))
   def get_test_splits(self):
     return ["test"]
+
+
+class GeoNY(TokenClassificationTask):
+  """Question Type Classification."""
+
+  def __init__(self, config, tokenizer):
+    super(Mixed, self).__init__(config, "geony", tokenizer,
+                                ['[PAD]','[CLS]','[SEP]', 'B-ADM', 'I-ADM', 'B-BUI', 'I-BUI','B-TRA', 'I-TRA', 'O'])
+
+  def get_examples(self, split):
+    if split == "dev":
+      split = "val"
+    return self._load_processed(self.config.json_data_dir(self.name + "/" + split + ".json"))
+
+  def get_test_splits(self):
+    return ["test"]
+
+class GeoNZ(TokenClassificationTask):
+  """Question Type Classification."""
+
+  def __init__(self, config, tokenizer):
+    super(Mixed, self).__init__(config, "geonz", tokenizer,
+                                ['[PAD]','[CLS]','[SEP]', 'B-ADM', 'I-ADM', 'B-BUI', 'I-BUI','B-TRA', 'I-TRA', 'O'])
+
+  def get_examples(self, split):
+    if split == "dev":
+      split = "val"
+    return self._load_processed(self.config.json_data_dir(self.name + "/" + split + ".json"))
+
+  def get_test_splits(self):
+    return ["test"]
