@@ -674,7 +674,7 @@ class GeoNY(TokenClassificationTask):
   """Question Type Classification."""
 
   def __init__(self, config, tokenizer):
-    super(Mixed, self).__init__(config, "geony", tokenizer,
+    super(GeoNY, self).__init__(config, "geony", tokenizer,
                                 ['[PAD]','[CLS]','[SEP]', 'B-ADM', 'I-ADM', 'B-BUI', 'I-BUI','B-TRA', 'I-TRA', 'O'])
 
   def get_examples(self, split):
@@ -689,7 +689,7 @@ class GeoNZ(TokenClassificationTask):
   """Question Type Classification."""
 
   def __init__(self, config, tokenizer):
-    super(Mixed, self).__init__(config, "geonz", tokenizer,
+    super(GeoNZ, self).__init__(config, "geonz", tokenizer,
                                 ['[PAD]','[CLS]','[SEP]', 'B-ADM', 'I-ADM', 'B-BUI', 'I-BUI','B-TRA', 'I-TRA', 'O'])
 
   def get_examples(self, split):
