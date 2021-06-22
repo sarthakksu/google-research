@@ -27,7 +27,7 @@ def get_shared_feature_specs(config):
   """Non-task-specific model inputs."""
   return [
       FeatureSpec("input_ids", [config.max_seq_length]),
-      FeatureSpec("input_mask", [config.max_seq_length]),
+      FeatureSpec("input_mask", [config.max_seq_length],is_int_feature=True),
       FeatureSpec("segment_ids", [config.max_seq_length]),
       FeatureSpec("task_id", []),
   ]

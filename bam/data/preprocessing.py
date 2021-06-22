@@ -98,8 +98,10 @@ class Preprocessor(object):
         task_examples = task.get_examples(split)
         sizes[task.name] = len(task_examples)
         examples += task_examples
-      while len(examples) % batch_size != 0:
-        examples.append(PaddingInputExample())
+      last_index = len(examples) - (len(examples) % batch_size)
+      #while len(examples) % batch_size != 0:
+      #  examples.append(PaddingInputExample())
+      examples = examples[:last_index] #drop the instances if batch size does not perfectly split the set
       if is_training:
         random.shuffle(examples)
       n_examples = len(examples)

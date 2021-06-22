@@ -21,7 +21,7 @@ from __future__ import print_function
 
 import abc
 import tensorflow.compat.v1 as tf
-
+import sys
 from bam.bert import tokenization
 from bam.data import feature_spec
 from bam.data import task_weighting
@@ -325,8 +325,8 @@ class TokenClassificationTask(NERTask):
 
   def get_feature_specs(self):
     feature_specs = [feature_spec.FeatureSpec(self.name + "_eid", []),
-                     feature_spec.FeatureSpec(self.name + "_label_ids", [self.config.max_seq_length], is_int_feature=True),
-                     feature_spec.FeatureSpec(self.name + "_masks", [self.config.max_seq_length], is_int_feature=False)]
+                     feature_spec.FeatureSpec(self.name + "_label_ids", [self.config.max_seq_length], is_int_feature=True)] #,
+                     #feature_spec.FeatureSpec(self.name +  "_masks", [self.config.max_seq_length], is_int_feature=False)]
     if self.config.distill:
       feature_specs.append(feature_spec.FeatureSpec(
           self.name + "_distill_targets", [self.config.max_seq_length], is_int_feature=False))
@@ -335,7 +335,7 @@ class TokenClassificationTask(NERTask):
   def _add_features(self, features, example, distill_inputs):
     label_id = example.label
     features[example.task_name + "_label_ids"] = label_id
-    features[example.task_name + "_masks"] = example.mask
+    #features[example.task_name + "_masks"] = example.mask
     if distill_inputs is not None:
       features[self.name + "_distill_targets"] = distill_inputs
 
@@ -344,18 +344,20 @@ class TokenClassificationTask(NERTask):
     num_labels = len(self._label_list)
     #if self.crf is None:
     self.crf = CustomCRF(units=num_labels)
-    
     reprs = bert_model.get_sequence_output()
-
+    
     if is_training:
       reprs = tf.nn.dropout(reprs, keep_prob=0.9)
-    mask = features[self.name + "_masks"]
-    mask2len = tf.reduce_sum(mask, axis=1)
+    #mask = features[self.name + "_masks"]
+    mask = features["input_mask"]
+    #mask2len = tf.reduce_sum(mask, axis=1)
+    #print_op = tf.print(mask, output_stream=sys.stderr)
+    #with tf.control_dependencies([print_op]):
     decoded_sequence,  best_score, forward_score, backward_score = self.crf(reprs,mask)#tf.layers.dense(reprs, num_labels)
     posterior_score = forward_score + backward_score
 
    
-    #log_probs = tf.nn.log_softmax(posterior_score, axis=-1)
+    log_probs = tf.nn.log_softmax(posterior_score, axis=-1)
 
     label_ids = features[self.name + "_label_ids"]
     if self.config.distill:
@@ -370,8 +372,9 @@ class TokenClassificationTask(NERTask):
                   (teacher_labels * self.config.distill_weight))
     else:
       labels = tf.one_hot(label_ids, depth=num_labels, dtype=tf.float32)
-    losses = tf.repeat(tf.expand_dims(distillation_loss(posterior_score, labels, mask, self.T),axis=0),repeats=[label_ids.shape[0]])
-    #losses = -tf.reduce_sum(labels * log_probs, axis=-1)
+      #print(labels.shape,log_probs.shape)
+    #losses_ = tf.repeat(tf.expand_dims(distillation_loss(posterior_score, labels, mask, self.T),axis=0),repeats=[label_ids.shape[0]])
+    losses = -tf.reduce_sum(tf.reduce_sum(labels * log_probs, axis=-1),axis=-1)
     #losses, trans = self.crf_loss(logits,labels * log_probs,mask,num_labels,mask2len)
     #predict,viterbi_score = tf.contrib.crf.crf_decode(logits, trans, mask2len)
     outputs = dict(
