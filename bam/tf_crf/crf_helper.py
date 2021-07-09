@@ -5,7 +5,7 @@ from collections import namedtuple
 from typing import List, Tuple, Dict
 
 
-from tf_crf_layer.exceptions import ConfigurationError
+from bam.tf_crf.exceptions import ConfigurationError
 
 ConstraintType = namedtuple('ConstraintType', ["BIO", "IOB1", "BIOUL", "BMES"])
 constraint_type = ConstraintType("BIO", "IOB1", "BIOUL", "BMES")

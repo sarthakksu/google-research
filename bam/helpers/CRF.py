@@ -1,8 +1,8 @@
 import warnings
 import tensorflow as tf
 import numpy as np
-from tf_crf_layer.layer import CRF
-from tf_crf_layer.crf import crf_decode
+from bam.tf_crf.layer import CRF
+from bam.tf_crf.crf import crf_decode
 
 
 def _forward_alg(feats, lens_, transitions, units, START_TAG=0, STOP_TAG=1):
@@ -108,8 +108,11 @@ def distillation_loss(features, teacher_features, mask, T = 1, teacher_is_score=
     teacher_prob=teacher_features
   #KD_loss = torch.nn.functional.kl_div(F.log_softmax(features/T, dim=-1), teacher_prob,reduction='none') * mask.unsqueeze(-1) * T * T
   KD_loss_fn = tf.keras.losses.KLDivergence(reduction=tf.losses.Reduction.NONE)
+  #print(teacher_prob,features,T)
   KD_loss = KD_loss_fn(tf.nn.log_softmax(features/T,axis=-1),teacher_prob) * tf.cast(mask,tf.float32) * T * T
-  KD_loss = tf.reduce_sum(KD_loss)/tf.constant(KD_loss.shape[0],dtype=tf.float32)
+  #print(tf.reduce_sum(KD_loss))
+  #print(tf.constant(KD_loss.shape[0].value,dtype=tf.float32))
+  KD_loss = tf.reduce_sum(KD_loss)/tf.constant(KD_loss.shape[0].value,dtype=tf.float32)
   return KD_loss
 
 class CustomCRF(CRF):
@@ -130,5 +133,5 @@ class CustomCRF(CRF):
                                      START_TAG=self.START_TAG, STOP_TAG=self.STOP_TAG)
         backward_score = _backward_alg(potentials, sequence_length, self.chain_kernel, units=self.units, T=1,
                                        START_TAG=self.START_TAG, STOP_TAG=self.STOP_TAG)
-
-        return (decoded_tags, best_score, forward_score, backward_score), None
+        #print("reached custom crf get_viterbi_decoding")
+        return decoded_tags, best_score, forward_score, backward_score

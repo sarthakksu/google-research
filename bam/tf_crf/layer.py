@@ -4,9 +4,9 @@ from tensorflow.python.keras import backend as K
 from tensorflow.python.keras import initializers, regularizers, constraints, \
     activations
 from tensorflow.python.keras.layers import InputSpec, Layer
-from tensorflow.contrib.crf import crf_decode, crf_log_likelihood
+from bam.tf_crf.crf import crf_decode, crf_log_likelihood
 
-from tf_crf_layer import keras_utils
+from bam.tf_crf import keras_utils
 
 """
 TODO
@@ -195,7 +195,7 @@ class CRF(Layer):
 
         if self.learn_mode == 'join':
             # WHY: don't remove this line, useless but remote it will cause bug
-            test_output = tf.cast(test_output, tf.float32)
+            #test_output = tf.cast(test_output, tf.float32)
             out = test_output
         else:
             # TODO: not supported yet
@@ -279,9 +279,9 @@ class CRF(Layer):
     def get_viterbi_decoding(self, input_energy, nwords):
         chain_kernel = self.compute_effective_chain_kernel()
 
-        pred_ids, _ = crf_decode(input_energy, chain_kernel, nwords)
+        pred_ids, best_score  = crf_decode(input_energy, chain_kernel, nwords)
 
-        return pred_ids
+        return pred_ids, best_score
 
     def get_config(self):
         # will be used for loading model from disk,
