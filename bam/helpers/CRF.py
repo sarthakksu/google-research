@@ -108,15 +108,15 @@ def distillation_loss(features, teacher_features, mask, T = 1, teacher_is_score=
     teacher_prob=teacher_features
   #KD_loss = torch.nn.functional.kl_div(F.log_softmax(features/T, dim=-1), teacher_prob,reduction='none') * mask.unsqueeze(-1) * T * T
   KD_loss_fn = tf.keras.losses.KLDivergence(reduction=tf.losses.Reduction.NONE)
-  KD_loss = KD_loss_fn(tf.nn.log_softmax(features/T,axis=-1),teacher_prob) * mask * T * T
+  KD_loss = KD_loss_fn(tf.nn.log_softmax(features/T,axis=-1),teacher_prob) * tf.cast(mask,tf.float32) * T * T
   KD_loss = tf.reduce_sum(KD_loss)/tf.constant(KD_loss.shape[0],dtype=tf.float32)
   return KD_loss
 
 class CustomCRF(CRF):
     def __init__(
             self,
-            START_TAG: int = 0,
-            STOP_TAG: int = 1,
+            START_TAG: int = 1,
+            STOP_TAG: int = 2,
             **kwargs,
     ):
         super().__init__(**kwargs)

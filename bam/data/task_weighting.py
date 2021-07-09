@@ -46,7 +46,12 @@ def _multiples_and_weights(config):
       "qqp": 363869,
       "sst": 67349,
       "sts": 11498,
-      "rte": 2490
+      "rte": 2490,
+      "covid" : 6708,
+      "mixed" : 2620,
+      "geonz" : 999,
+      "geony" : 999,
+      "loxexp" : 682
   }
 
   def map_values(f, d):

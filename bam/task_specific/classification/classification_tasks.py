@@ -30,6 +30,7 @@ from bam.task_specific import task
 from bam.task_specific.classification import classification_metrics
 from bam.data.NERLoader import NERLoader
 from bam.helpers.CRF import CustomCRF,distillation_loss
+from bam.helpers.crf_static_contraint_helper import allowed_transitions
 import json
 class InputExample(task.Example):
   """A single training/test example for simple sequence classification."""
@@ -343,7 +344,8 @@ class TokenClassificationTask(NERTask):
                             percent_done):
     num_labels = len(self._label_list)
     #if self.crf is None:
-    self.crf = CustomCRF(units=num_labels)
+    constraints = allowed_transitions("BIO", dict(enumerate(self._label_list)))
+    self.crf = CustomCRF(units=num_labels,chain_constraint=constraints[1])
     reprs = bert_model.get_sequence_output()
     
     if is_training:
@@ -357,7 +359,7 @@ class TokenClassificationTask(NERTask):
     posterior_score = forward_score + backward_score
 
    
-    log_probs = tf.nn.log_softmax(posterior_score, axis=-1)
+    #log_probs = tf.nn.log_softmax(posterior_score, axis=-1)
 
     label_ids = features[self.name + "_label_ids"]
     if self.config.distill:
@@ -373,8 +375,8 @@ class TokenClassificationTask(NERTask):
     else:
       labels = tf.one_hot(label_ids, depth=num_labels, dtype=tf.float32)
       #print(labels.shape,log_probs.shape)
-    #losses_ = tf.repeat(tf.expand_dims(distillation_loss(posterior_score, labels, mask, self.T),axis=0),repeats=[label_ids.shape[0]])
-    losses = -tf.reduce_sum(tf.reduce_sum(labels * log_probs, axis=-1),axis=-1)
+    losses = tf.repeat(tf.expand_dims(distillation_loss(posterior_score, labels, mask, self.T),axis=0),repeats=[label_ids.shape[0]])
+    #losses = -tf.reduce_sum(tf.reduce_sum(labels * log_probs, axis=-1),axis=-1)
     #losses, trans = self.crf_loss(logits,labels * log_probs,mask,num_labels,mask2len)
     #predict,viterbi_score = tf.contrib.crf.crf_decode(logits, trans, mask2len)
     outputs = dict(

@@ -59,8 +59,8 @@ class Config(object):
                                # put on distill targets vs gold-standard label
 
     # sizing
-    self.max_seq_length = 128
-    self.train_batch_size = 128
+    self.max_seq_length = 512
+    self.train_batch_size = 8
     self.eval_batch_size = 8
     self.predict_batch_size = 8
     self.double_unordered = True  # for tasks like paraphrase where sentence
@@ -90,7 +90,7 @@ class Config(object):
     if self.n_tasks == 1:
       self.dataset_multiples = False
       self.train_batch_size = 8
-      self.num_train_epochs = 3.0
+      self.num_train_epochs = 20.0
       self.learning_rate = 5e-5
 
     # debug-mode settings
