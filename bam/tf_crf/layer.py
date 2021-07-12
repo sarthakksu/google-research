@@ -112,7 +112,7 @@ class CRF(Layer):
         self.input_dim = input_shape[-1]
 
         self.transition_constraint_mask = self.add_weight(
-            shape=(self.units + 2, self.units + 2),
+            shape=(self.units, self.units),
             name='transition_constraint_mask',
             initializer=initializers.Constant(
                 self.get_transition_constraint_mask()
@@ -391,8 +391,8 @@ class CRF(Layer):
 
     def compute_effective_boundary(self):
         if self.transition_constraint:
-            start_tag = self.units
-            end_tag = self.units + 1
+            start_tag = self.units-2
+            end_tag = self.units - 1
 
             left_boundary = (
                     self.left_boundary * self.transition_constraint_mask[start_tag, :self.units] +

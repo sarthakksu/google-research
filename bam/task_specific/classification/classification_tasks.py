@@ -346,7 +346,7 @@ class TokenClassificationTask(NERTask):
     num_labels = len(self._label_list)
     #if self.crf is None:
     constraints = allowed_transitions("BIO", dict(enumerate(self._label_list)))
-    self.crf = CustomCRF(units=num_labels,transition_constraint=constraints)
+    self.crf = CustomCRF(units=num_labels,START_TAG = num_labels-2, STOP_TAG = num_labels-1, transition_constraint=constraints)
     reprs = bert_model.get_sequence_output()
     
     if is_training:
@@ -638,7 +638,7 @@ class Covid(TokenClassificationTask):
 
   def __init__(self, config, tokenizer):
     super(Covid, self).__init__(config, "covid", tokenizer,
-                               ['[PAD]','[CLS]','[SEP]', 'B-STA', 'I-STA', 'B-CONTR', 'I-CONTR','B-NCT', 'I-NCT', 'B-LB', 'I-LB', 'B-REG', 'I-REG', 'B-OTH', 'I-OTH', 'O'])
+                               ['[PAD]', 'B-STA', 'I-STA', 'B-CONTR', 'I-CONTR','B-NCT', 'I-NCT', 'B-LB', 'I-LB', 'B-REG', 'I-REG', 'B-OTH', 'I-OTH', 'O','[CLS]','[SEP]'])
     
   def get_examples(self, split):
     if split == "dev":
@@ -653,7 +653,7 @@ class Mixed(TokenClassificationTask):
 
   def __init__(self, config, tokenizer):
     super(Mixed, self).__init__(config, "mixed", tokenizer,
-                               ['[PAD]','[CLS]','[SEP]', 'B-STA', 'I-STA', 'B-CONTR', 'I-CONTR','B-NCT', 'I-NCT', 'B-LB', 'I-LB', 'B-REG', 'I-REG', 'B-OTH', 'I-OTH', 'O'])
+                               ['[PAD]', 'B-STA', 'I-STA', 'B-CONTR', 'I-CONTR','B-NCT', 'I-NCT', 'B-LB', 'I-LB', 'B-REG', 'I-REG', 'B-OTH', 'I-OTH', 'O','[CLS]','[SEP]'])
     
   def get_examples(self, split):
     if split == "dev":
@@ -667,7 +667,7 @@ class LocExp(TokenClassificationTask):
 
   def __init__(self, config, tokenizer):
     super(LocExp, self).__init__(config, "locexp", tokenizer,
-                               ['[PAD]','[CLS]','[SEP]', 'B-LOC', 'I-LOC','O'])
+                               ['[PAD]', 'B-LOC', 'I-LOC','O','[CLS]','[SEP]'])
     
   def get_examples(self, split):
     if split == "dev":
@@ -682,7 +682,7 @@ class GeoNY(TokenClassificationTask):
 
   def __init__(self, config, tokenizer):
     super(GeoNY, self).__init__(config, "geony", tokenizer,
-                                ['[PAD]','[CLS]','[SEP]', 'B-ADM', 'I-ADM', 'B-BUI', 'I-BUI','B-TRA', 'I-TRA', 'O'])
+                                ['[PAD]', 'B-ADM', 'I-ADM', 'B-BUI', 'I-BUI','B-TRA', 'I-TRA', 'O','[CLS]','[SEP]'])
 
   def get_examples(self, split):
     if split == "dev":
@@ -697,7 +697,7 @@ class GeoNZ(TokenClassificationTask):
 
   def __init__(self, config, tokenizer):
     super(GeoNZ, self).__init__(config, "geonz", tokenizer,
-                                ['[PAD]','[CLS]','[SEP]', 'B-ADM', 'I-ADM', 'B-BUI', 'I-BUI','B-TRA', 'I-TRA', 'O'])
+                                ['[PAD]', 'B-ADM', 'I-ADM', 'B-BUI', 'I-BUI','B-TRA', 'I-TRA', 'O','[CLS]','[SEP]'])
 
   def get_examples(self, split):
     if split == "dev":
