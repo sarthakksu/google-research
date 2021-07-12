@@ -381,9 +381,9 @@ class CRF(Layer):
     def get_transition_constraint_mask(self):
         if not self.transition_constraint:
             # All transitions are valid.
-            constraint_mask = np.ones([self.units + 2, self.units + 2])
+            constraint_mask = np.ones([self.units, self.units])
         else:
-            constraint_mask = np.zeros([self.units + 2, self.units + 2])
+            constraint_mask = np.zeros([self.units, self.units])
             for i, j in self.transition_constraint:
                 constraint_mask[i, j] = 1.0
 
